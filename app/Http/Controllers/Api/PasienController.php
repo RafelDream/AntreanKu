@@ -116,6 +116,7 @@ class PasienController extends Controller
         // Cegah antrean ganda untuk pasien yang sama hari ini
         $existing = Antrean::where('pasien_id', $pasienId)
             ->where('tanggal_antrean', $hariIni)
+            ->whereNotIn('status', ['dibatalakan', 'hangus'])
             ->lockForUpdate()
             ->first();
 

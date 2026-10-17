@@ -10,10 +10,16 @@ class BaseFormRequest extends FormRequest
 {
     protected function failedValidation(Validator $validator)
     {
-        throw new HttpResponseException(response()->json([
-            'success' => false,
-            'message' => $validator->errors()->first(),
-            'errors'  => $validator->errors(),
-        ], 422));
+        // Rute API -> JSON 422 (perilaku lama, aman untuk Postman)
+        if ($this->is('api/*') || $this->expectsJson()) {
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+                'errors'  => $validator->errors(),
+            ], 422));
+        }
+
+        // Rute web (form Blade) -> redirect kembali + error + old input
+        parent::failedValidation($validator);
     }
 }
