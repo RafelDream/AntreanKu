@@ -21,6 +21,8 @@ Route::controller(PendaftaranController::class)->group(function () {
     // Konfirmasi identitas (popup) -> terbitkan antrean
     Route::post('/masuk/konfirmasi', 'konfirmasiMasuk')->name('masuk.konfirmasi')->middleware('throttle:20,1');
 
+    Route::get('/antrean/{token}', fn (string $token) => view('antrean.status', compact('token')));
+
     // Tiket antrean (diakses lewat token acak, bukan ID berurutan)
     Route::get('/antrean/{token}', 'tiket')
         ->name('antrean.tiket')->where('token', '[A-Za-z0-9]{32}');

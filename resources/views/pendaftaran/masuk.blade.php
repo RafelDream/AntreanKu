@@ -18,6 +18,10 @@
         </div>
     @enderror
 
+    @error('diblokir')
+        <div class="alert alert--error" role="alert">{{ $message }}</div>
+    @enderror
+
     <form method="POST" action="{{ route('masuk.cek') }}" class="form" novalidate data-once>
         @csrf
 

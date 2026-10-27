@@ -10,6 +10,13 @@ class AntreanController extends Controller
 {
     public function __construct(private AntreanService $antreanService) {}
 
+    public function status(string $token)
+    {
+        $data = $this->antreanService->getStatus($token);
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
     public function batalkanOlehPasien(BatalAntreanRequest $request)
     {
         $antrean = $this->antreanService->batalkanOlehPasien($request->token);
@@ -17,7 +24,7 @@ class AntreanController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Antrean berhasil dibatalkan',
-            'data' => ['nomor_antrean' => $antrean->nomor_antrean],
+            'data'    => ['nomor_antrean' => $antrean->nomor_antrean],
         ]);
     }
 

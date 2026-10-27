@@ -11,6 +11,7 @@ use App\Models\Antrean;
 use App\Models\Pasien;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use illuminate\support\Facades\Cache;
 
 class PasienController extends Controller
 {
@@ -74,21 +75,33 @@ class PasienController extends Controller
 
     public function cekNik(CekNikRequest $request)
     {
+        $cacheKey = 'cek_nik_gagal_' . $request->ip();
+
+        if (Cache::get($cacheKey, 0) >= 5) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terlalu banyak percobaan gagal, coba lagi dalam 10 menit',
+            ], 429);
+        }
+
         $pasien = Pasien::where('nik', $request->nik)->first();
 
         if (! $pasien) {
+            Cache::put($cacheKey, Cache::get($cacheKey, 0) + 1, now()->addMinutes(10));
             return response()->json([
                 'success' => false,
                 'message' => 'NIK belum terdaftar, silakan daftar sebagai pasien baru',
             ], 404);
         }
 
+        Cache::forget($cacheKey);
+
         return response()->json([
             'success' => true,
             'data' => [
-                'pasien_id'    => $pasien->id,
-                'nik_tersamar' => substr($pasien->nik, 0, 3) . str_repeat('x', 13),
-                'nama_lengkap' => $pasien->nama_lengkap,
+                'pasien_id'     => $pasien->id,
+                'nik_tersamar'  => substr($pasien->nik, 0, 3) . str_repeat('x', 13),
+                'nama_tersamar' => $this->maskNama($pasien->nama_lengkap),
             ],
         ]);
     }
@@ -136,5 +149,12 @@ class PasienController extends Controller
             'status'          => 'menunggu',
             'token'           => Str::random(32),
         ]);
+    }
+
+    private function maskNama(string $nama): string
+    {
+        return collect(explode(' ', $nama))
+            ->map(fn($kata) => mb_substr($kata, 0, 1) . str_repeat('*', max(mb_strlen($kata) - 1, 0)))
+            ->implode(' ');
     }
 }

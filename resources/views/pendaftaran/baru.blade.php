@@ -24,10 +24,10 @@
                  :max="now()->toDateString()" autocomplete="bday" required />
 
         <x-field name="alamat" label="Alamat" placeholder="alamat sesuai KTP"
-                 autocomplete="street-address" />
+                 autocomplete="street-address" required />
 
         <x-field name="no_telepon" label="Nomor telepon" type="tel" placeholder="08xx-xxxx-xxxx"
-                 inputmode="tel" autocomplete="tel" />
+                 inputmode="tel" autocomplete="tel" required />
 
         <x-consent />
 

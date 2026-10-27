@@ -14,10 +14,12 @@
         <div class="alert alert--warn" role="status">{{ session('info') }}</div>
     @endif
 
-    <div id="tiket" 
-         data-status-url="{{ route('antrean.status', $antrean->token) }}"
-         data-batal-url="{{ url('/api/antrean/batal') }}"
+    {{-- Alamat relatif (tanpa http/https) supaya aman saat diakses lewat ngrok --}}
+    <div id="tiket"
+         data-status-url="{{ route('antrean.status', $antrean->token, false) }}"
+         data-batal-url="/api/antrean/batal"
          data-token="{{ $antrean->token }}">
+
         <section class="ticket" aria-label="Nomor antrean Anda">
             <p class="ticket__label">Nomor antrean Anda</p>
             <p class="ticket__number">{{ $antrean->nomor_antrean }}</p>
@@ -50,34 +52,26 @@
             </div>
         </div>
 
-        {{-- Tombol Batalkan Antrean --}}
-        <div id="aksi-batal" style="margin-top: 1.5rem; text-align: center;" @if($ringkasan['status'] !== 'menunggu') hidden @endif>
-            <button type="button" id="open-modal-batal" class="btn btn--danger" style="width: 100%; padding: 0.75rem; background: #dc2626; color: #fff; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">
-                Batalkan Antrean
-            </button>
-        </div>
-
         <p id="koneksi" class="alert alert--warn" role="status" hidden>Koneksi Terputus. Data antrean belum diperbarui.</p>
-    </div>
 
-    {{-- CUSTOM POP-UP MODAL KONFIRMASI --}}
-    <div id="modal-batal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 999; align-items: center; justify-content: center; padding: 1rem;">
-        <div style="background: #fff; width: 100%; max-width: 400px; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-            <h3 style="font-size: 1.25rem; font-weight: bold; margin-bottom: 0.5rem; color: #1f2937;">Konfirmasi Pembatalan</h3>
-            <p style="color: #4b5563; font-size: 0.95rem; margin-bottom: 1.5rem;">Apakah Anda yakin ingin membatalkan nomor antrean ini? Tindakan ini tidak dapat dibatalkan.</p>
-            
-            {{-- Bagian tombol saja yang dibuat sejajar di tengah (justify-content: center) --}}
-            <div style="display: flex; gap: 0.75rem; justify-content: center;">
-                <button type="button" id="btn-tutup-modal" style="padding: 0.6rem 1.25rem; background: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; font-weight: 500; cursor: pointer; min-width: 100px;">
-                    Tidak
-                </button>
-                <button type="button" id="btn-eksekusi-batal" style="padding: 0.6rem 1.25rem; background: #dc2626; color: #fff; border: none; border-radius: 0.375rem; font-weight: 500; cursor: pointer; min-width: 120px;">
-                    Ya, Batalkan
-                </button>
-            </div>
+        {{-- Batalkan antrean: hanya tampil selama status "menunggu" (disembunyikan otomatis oleh polling) --}}
+        <p id="batal-error" class="alert alert--error" role="alert" hidden></p>
+
+        <div id="aksi-batal" class="aksi" @if ($ringkasan['status'] !== 'menunggu') hidden @endif>
+            <button type="button" id="open-modal-batal" class="btn btn--danger-outline">Batalkan Antrean</button>
         </div>
     </div>
-    {{-- END POP-UP MODAL --}}
+
+    {{-- Popup konfirmasi pembatalan --}}
+    <div id="modal-batal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-batal-judul" hidden>
+        <div class="modal__box">
+            <h2 id="modal-batal-judul" class="modal__title">Konfirmasi Pembatalan</h2>
+            <p class="modal__text">Apakah Anda yakin ingin membatalkan nomor antrean ini? Tindakan ini tidak dapat dibatalkan.</p>
+
+            <button type="button" id="btn-eksekusi-batal" class="btn btn--danger">Ya, Batalkan</button>
+            <button type="button" id="btn-tutup-modal" class="btn btn--ghost">Tidak</button>
+        </div>
+    </div>
 
     <p class="switch">Nomor ini hanya berlaku hari ini.</p>
 @endsection
@@ -90,13 +84,15 @@
     var url = box.getAttribute('data-status-url');
     var batalUrl = box.getAttribute('data-batal-url');
     var token = box.getAttribute('data-token');
+
     var aksiBatal = document.getElementById('aksi-batal');
-    
-    // Elemen Modal
-    var modalBatal = document.getElementById('modal-batal');
-    var openModalBtn = document.getElementById('open-modal-batal');
-    var tutupModalBtn = document.getElementById('btn-tutup-modal');
-    var eksekusiBatalBtn = document.getElementById('btn-eksekusi-batal');
+    var batalError = document.getElementById('batal-error');
+    var modal = document.getElementById('modal-batal');
+    var btnBuka = document.getElementById('open-modal-batal');
+    var btnTutup = document.getElementById('btn-tutup-modal');
+    var btnBatal = document.getElementById('btn-eksekusi-batal');
+
+    /* ---------- Polling status ---------- */
 
     function tampil(d) {
         document.getElementById('sedang').textContent = d.sedang_dilayani != null ? d.sedang_dilayani : '—';
@@ -105,9 +101,7 @@
         chip.textContent = d.status_label;
         chip.className = 'chip chip--' + d.status;
 
-        if (aksiBatal) {
-            aksiBatal.hidden = (d.status !== 'menunggu');
-        }
+        aksiBatal.hidden = (d.status !== 'menunggu');
     }
 
     function perbarui() {
@@ -118,51 +112,58 @@
             .catch(function () { koneksi.hidden = false; });
     }
 
-    if (openModalBtn) {
-        openModalBtn.addEventListener('click', function () {
-            modalBatal.style.display = 'flex';
-        });
+    /* ---------- Popup batalkan antrean ---------- */
+
+    function bukaModal() {
+        batalError.hidden = true;
+        modal.hidden = false;
+        btnTutup.focus(); // fokus awal ke "Tidak" agar tidak terpencet tak sengaja
     }
 
-    if (tutupModalBtn) {
-        tutupModalBtn.addEventListener('click', function () {
-            modalBatal.style.display = 'none';
-        });
+    function tutupModal() {
+        modal.hidden = true;
+        if (!aksiBatal.hidden) { btnBuka.focus(); }
     }
 
-    if (eksekusiBatalBtn) {
-        eksekusiBatalBtn.addEventListener('click', function () {
-            eksekusiBatalBtn.disabled = true;
-            eksekusiBatalBtn.textContent = 'Memproses...';
-
-            fetch(batalUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify({ token: token })
-            })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-                modalBatal.style.display = 'none';
-                eksekusiBatalBtn.disabled = false;
-                eksekusiBatalBtn.textContent = 'Ya, Batalkan';
-
-                if (res.success) {
-                    perbarui();
-                } else {
-                    alert(res.message || 'Gagal membatalkan antrean.');
-                }
-            })
-            .catch(function () {
-                modalBatal.style.display = 'none';
-                eksekusiBatalBtn.disabled = false;
-                eksekusiBatalBtn.textContent = 'Ya, Batalkan';
-                alert('Terjadi kesalahan koneksi.');
-            });
-        });
+    function tampilError(pesan) {
+        batalError.textContent = pesan;
+        batalError.hidden = false;
     }
+
+    btnBuka.addEventListener('click', bukaModal);
+    btnTutup.addEventListener('click', tutupModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) { tutupModal(); } });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) { tutupModal(); }
+    });
+
+    btnBatal.addEventListener('click', function () {
+        btnBatal.disabled = true;
+        btnBatal.textContent = 'Memproses...';
+
+        fetch(batalUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ token: token })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            tutupModal();
+            if (res.success) {
+                perbarui();
+            } else {
+                tampilError(res.message || 'Gagal membatalkan antrean.');
+            }
+        })
+        .catch(function () {
+            tutupModal();
+            tampilError('Terjadi kesalahan koneksi. Coba lagi.');
+        })
+        .then(function () {
+            btnBatal.disabled = false;
+            btnBatal.textContent = 'Ya, Batalkan';
+        });
+    });
 
     setInterval(perbarui, 5000);
     document.addEventListener('visibilitychange', perbarui);

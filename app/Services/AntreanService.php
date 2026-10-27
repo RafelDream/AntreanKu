@@ -5,8 +5,11 @@ namespace App\Services;
 use App\Models\Antrean;
 use App\Models\Pasien;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Logika bisnis registrasi & penerbitan antrean.
@@ -24,6 +27,35 @@ class AntreanService
         'hangus'      => 'Hangus',
         'dibatalkan'  => 'Dibatalkan',
     ];
+
+    /** Mendapatkan status antrean berdasarkan token. */
+    public function getStatus(string $token): array
+    {
+        Log::info('STATUS: request masuk');
+
+        $antrean = Antrean::where('token', $token)->first();
+
+        if (! $antrean) {
+            abort(404, 'Tiket antrean tidak ditemukan');
+        }
+
+        $hariIni = $antrean->tanggal_antrean->toDateString();
+
+        $nomorBerjalan = Cache::remember("antrean_berjalan_{$hariIni}", 3, function () use ($hariIni) {
+            Log::info('STATUS: CACHE MISS, query nomor berjalan dijalankan');
+
+            return Antrean::where('tanggal_antrean', $hariIni)
+                ->whereIn('status', ['dipanggil', 'hadir', 'selesai'])
+                ->max('nomor_antrean') ?? 0;
+        });
+
+        return [
+            'nomor_saya'     => $antrean->nomor_antrean,
+            'nomor_berjalan' => $nomorBerjalan,
+            'sisa_di_depan'  => max(0, $antrean->nomor_antrean - $nomorBerjalan - 1),
+            'status'         => $antrean->status,
+        ];
+    }
 
     /** Pasien baru: simpan data, buat No. RM otomatis (RM0001), lalu terbitkan antrean. */
     public function daftarPasienBaru(array $data): array
@@ -62,6 +94,26 @@ class AntreanService
     public function nikTersamar(Pasien $pasien): ?string
     {
         return $pasien->nik ? substr($pasien->nik, 0, 3) . str_repeat('x', 13) : null;
+    }
+
+    public function maskNama(string $nama): string
+    {
+        return collect(preg_split('/\s+/u', trim($nama), -1, PREG_SPLIT_NO_EMPTY))
+            ->map(fn ($kata) => mb_substr($kata, 0, 1) . str_repeat('*', max(mb_strlen($kata) - 1, 0)))
+            ->implode(' ');
+    }
+
+    /** Sisa detik blokir (0 = boleh mencoba). Maks. 5 gagal per 10 menit per IP. */
+    public function sisaBlokirCekIdentitas(string $ip): int
+    {
+        $kunci = 'cek-identitas:' . $ip;
+
+        return RateLimiter::tooManyAttempts($kunci, 5) ? RateLimiter::availableIn($kunci) : 0;
+    }
+
+    public function catatGagalCekIdentitas(string $ip): void
+    {
+        RateLimiter::hit('cek-identitas:' . $ip, 600);
     }
 
     /**

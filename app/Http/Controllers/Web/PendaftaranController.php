@@ -42,9 +42,15 @@ class PendaftaranController extends Controller
 
     public function cekMasuk(CekNikRequest $request)
     {
+        if ($blokir = $this->tolakJikaDiblokir($request, 'masuk')) {
+            return $blokir;
+        }
+
         $pasien = $this->antreanService->cariByNik($request->nik);
 
         if (! $pasien) {
+            $this->antreanService->catatGagalCekIdentitas($request->ip());
+
             return redirect()->route('masuk')
                 ->withInput()
                 ->withErrors(['nik_belum_terdaftar' => 'NIK belum terdaftar, silakan daftar sebagai pasien baru']);
@@ -62,18 +68,34 @@ class PendaftaranController extends Controller
 
     public function cekLupaNik(RegistrasiPasienLamaRequest $request)
     {
-        $pasien = $this->antreanService->cariPasienLama(
-            trim($request->no_rekam_medis),
-            $request->tanggal_lahir
-        );
+        if ($blokir = $this->tolakJikaDiblokir($request, 'masuk.lupa')) {
+            return $blokir;
+        }
+
+        $pasien = $this->antreanService->cariPasienLama(trim($request->no_rekam_medis), $request->tanggal_lahir);
 
         if (! $pasien) {
+            $this->antreanService->catatGagalCekIdentitas($request->ip());
+
             return redirect()->route('masuk.lupa')
                 ->withInput()
                 ->withErrors(['login' => 'Nomor Rekam Medis atau Tanggal Lahir tidak cocok']);
         }
 
         return $this->mintaKonfirmasi($request, $pasien, 'masuk.lupa');
+    }
+
+    private function tolakJikaDiblokir(Request $request, string $kembaliKe)
+    {
+        $sisa = $this->antreanService->sisaBlokirCekIdentitas($request->ip());
+
+        if ($sisa > 0) {
+            return redirect()->route($kembaliKe)->withInput()->withErrors([
+                'diblokir' => 'Terlalu banyak percobaan gagal. Coba lagi dalam ' . ceil($sisa / 60) . ' menit.',
+            ]);
+        }
+
+        return null;
     }
 
     /* ---------- Konfirmasi identitas (popup) -> terbitkan antrean ---------- */
@@ -125,7 +147,7 @@ class PendaftaranController extends Controller
 
         return redirect()->route($kembaliKe)->with('konfirmasi', [
             'nik_tersamar' => $this->antreanService->nikTersamar($pasien),
-            'nama_lengkap' => $pasien->nama_lengkap,
+            'nama_tersamar' => $this->antreanService->maskNama($pasien->nama_lengkap),
         ]);
     }
 }

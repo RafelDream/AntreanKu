@@ -592,3 +592,32 @@ a {
         margin: 0;
     }
 }
+
+/* tiket: batalkan antrean */
+.aksi {
+    margin-top: 16px;
+}
+.btn--danger {
+    background: var(--danger);
+    color: #fff;
+}
+.btn--danger-outline {
+    background: #fff;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+.chip--dibatalkan {
+    background: #fdecec;
+    color: #8e1b1b;
+}
+.modal__text {
+    margin: 0 0 20px;
+}
+@media (hover: hover) {
+    .btn--danger:hover {
+        background: #a81f1f;
+    }
+    .btn--danger-outline:hover {
+        background: #fdecec;
+    }
+}

@@ -10,7 +10,10 @@
                 @if (! empty($k['nik_tersamar']))
                     <div><dt>NIK</dt><dd>{{ $k['nik_tersamar'] }}</dd></div>
                 @endif
-                <div><dt>Nama</dt><dd>{{ $k['nama_lengkap'] }}</dd></div>
+
+                @if (! empty($k['nama_tersamar']))
+                    <div><dt>Nama</dt><dd>{{ $k['nama_tersamar'] }}</dd></div> 
+                @endif
             </dl>
 
             <form method="POST" action="{{ route('masuk.konfirmasi') }}" data-once>
