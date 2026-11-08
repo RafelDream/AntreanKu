@@ -8,10 +8,10 @@
     </header>
 
     @if (session('berhasil'))
-        <div class="alert alert--ok" role="status">{{ session('berhasil') }}</div>
+        <div class="alert alert--ok" role="status" data-auto-hide>{{ session('berhasil') }}</div>
     @endif
     @if (session('info'))
-        <div class="alert alert--warn" role="status">{{ session('info') }}</div>
+        <div class="alert alert--warn" role="status" data-auto-hide>{{ session('info') }}</div>
     @endif
 
     {{-- Alamat relatif (tanpa http/https) supaya aman saat diakses lewat ngrok --}}
@@ -43,7 +43,7 @@
 
         <div class="stats">
             <div class="stat">
-                <span>Sedang dilayani</span>
+                <span>Sedang dilayani antrian</span>
                 <strong id="sedang">{{ $ringkasan['sedang_dilayani'] ?? '—' }}</strong>
             </div>
             <div class="stat">
@@ -56,9 +56,15 @@
 
         {{-- Batalkan antrean: hanya tampil selama status "menunggu" (disembunyikan otomatis oleh polling) --}}
         <p id="batal-error" class="alert alert--error" role="alert" hidden></p>
+        <div id="batal-info" class="toast" role="status" aria-live="polite" hidden></div>
 
         <div id="aksi-batal" class="aksi" @if ($ringkasan['status'] !== 'menunggu') hidden @endif>
             <button type="button" id="open-modal-batal" class="btn btn--danger-outline">Batalkan Antrean</button>
+        </div>
+
+        {{-- Setelah dibatalkan: kembali ke halaman utama --}}
+        <div id="aksi-kembali" class="aksi" @if ($ringkasan['status'] !== 'dibatalkan') hidden @endif>
+            <a href="{{ route('beranda') }}" class="btn btn--primary">Kembali ke Halaman Utama</a>
         </div>
     </div>
 
@@ -86,11 +92,23 @@
     var token = box.getAttribute('data-token');
 
     var aksiBatal = document.getElementById('aksi-batal');
+    var aksiKembali = document.getElementById('aksi-kembali');
+    var batalInfo = document.getElementById('batal-info');
     var batalError = document.getElementById('batal-error');
     var modal = document.getElementById('modal-batal');
     var btnBuka = document.getElementById('open-modal-batal');
     var btnTutup = document.getElementById('btn-tutup-modal');
     var btnBatal = document.getElementById('btn-eksekusi-batal');
+
+    /* ---------- Pesan di atas halaman hilang otomatis (3 detik) ---------- */
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-auto-hide]'), function (el) {
+        setTimeout(function () {
+            el.style.transition = 'opacity .3s';
+            el.style.opacity = '0';
+            setTimeout(function () { el.hidden = true; }, 300);
+        }, 3000);
+    });
 
     /* ---------- Polling status ---------- */
 
@@ -102,6 +120,7 @@
         chip.className = 'chip chip--' + d.status;
 
         aksiBatal.hidden = (d.status !== 'menunggu');
+        aksiKembali.hidden = (d.status !== 'dibatalkan');
     }
 
     function perbarui() {
@@ -130,6 +149,19 @@
         batalError.hidden = false;
     }
 
+    // Notifikasi singkat: tampil 3 detik, memudar, lalu hilang sendiri (tanpa refresh)
+    var toastTimer = null;
+    function tampilToast(pesan) {
+        clearTimeout(toastTimer);
+        batalInfo.textContent = pesan;
+        batalInfo.classList.remove('toast--out');
+        batalInfo.hidden = false;
+        toastTimer = setTimeout(function () {
+            batalInfo.classList.add('toast--out');
+            setTimeout(function () { batalInfo.hidden = true; }, 300);
+        }, 3000);
+    }
+
     btnBuka.addEventListener('click', bukaModal);
     btnTutup.addEventListener('click', tutupModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) { tutupModal(); } });
@@ -150,6 +182,7 @@
         .then(function (res) {
             tutupModal();
             if (res.success) {
+                tampilToast(res.message || 'Antrean berhasil dibatalkan.');
                 perbarui();
             } else {
                 tampilError(res.message || 'Gagal membatalkan antrean.');

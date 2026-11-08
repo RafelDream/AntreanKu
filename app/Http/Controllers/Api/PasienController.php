@@ -87,7 +87,7 @@ class PasienController extends Controller
         $pasien = Pasien::where('nik', $request->nik)->first();
 
         if (! $pasien) {
-            Cache::put($cacheKey, Cache::get($cacheKey, 0) + 1, now()->addMinutes(10));
+            Cache::put($cacheKey, Cache::get($cacheKey, 0) + 1, now()->addMinutes(5));
             return response()->json([
                 'success' => false,
                 'message' => 'NIK belum terdaftar, silakan daftar sebagai pasien baru',
