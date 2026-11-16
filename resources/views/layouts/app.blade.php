@@ -15,8 +15,8 @@
     <div class="shell @yield('shell')">
         <aside class="brand-panel">
             <p class="brand-panel__logo">ANTREANKU</p>
-            <p class="brand-panel__title">Ambil nomor antrean tanpa perlu datang lebih dulu.</p>
-            <p class="brand-panel__text">Daftar atau masuk, dapatkan nomor, lalu pantau giliran Anda langsung dari ponsel.</p>
+            <p class="brand-panel__title">@yield('panel_title', 'Ambil nomor antrean tanpa perlu datang lebih dulu.')</p>
+            <p class="brand-panel__text">@yield('panel_text', 'Daftar atau masuk, dapatkan nomor, lalu pantau giliran Anda langsung dari ponsel.')</p>
         </aside>
 
         <main class="screen">

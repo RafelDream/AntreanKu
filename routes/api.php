@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\PasienController;
 use App\Http\Controllers\Api\AntreanController;
+use App\Http\Controllers\Api\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,11 @@ Route::get('/antrean/status/{token}', [AntreanController::class, 'status'])
 Route::post('/antrean/{id}/batal', [AntreanController::class, 'batalkanOlehAdmin'])
     ->middleware('auth:sanctum');
 
-    
+//Login Aadmin
+Route::post('/admin/login', [AuthController::class, 'login'])->middleware('throttle:20,1');
+
+Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/antrean/{id}/batal', [AntreanController::class, 'batalkanOlehAdmin']);
+    // Sprint 4: panggil, ubah status, sisipan masuk grup ini
+});

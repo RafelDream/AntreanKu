@@ -2,8 +2,24 @@
 
 use App\Http\Controllers\Web\PendaftaranController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Admin\LoginController;
 
 Route::view('/', 'beranda')->name('beranda');
+
+Route::get('/admin/login', [LoginController::class, 'show'])->name('login');
+Route::post('/admin/login', [LoginController::class, 'store'])
+    ->middleware('throttle:20,1')
+    ->name('crm.login.store');
+Route::post('/admin/logout', [LoginController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('crm.logout');
+
+Route::middleware('auth')->prefix('admin')->group(function () {
+    Route::get('/dashboard', fn () => view('crm.dashboard.index'))->name('crm.dashboard.index');
+    Route::get('/riwayat', fn () => view('crm.dashboard.riwayat'))->name('crm.riwayat.index');
+});
+
 
 Route::controller(PendaftaranController::class)->group(function () {
     // Pasien baru
